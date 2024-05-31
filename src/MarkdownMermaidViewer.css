@@ -1,0 +1,57 @@
+.markdown-container {
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  margin: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.markdown-container nav {
+  margin-bottom: 20px;
+}
+
+.markdown-container nav ul {
+  list-style: none;
+  padding: 0;
+}
+
+.markdown-container nav ul li {
+  margin: 5px 0;
+}
+
+.markdown-container nav ul li button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.markdown-container nav ul li button:hover {
+  background: #0056b3;
+}
+
+.markdown-container pre {
+  background: #f4f4f4;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.markdown-container code {
+  background: #f4f4f4;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.mermaid {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
