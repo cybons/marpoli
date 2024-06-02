@@ -1,0 +1,6 @@
+script_folder: "scripts"
+script_frequencies:
+  "sample1.py": 5 # 毎60分ごとに実行
+  "sample2.py": 10 # 毎120分ごとに実行
+start_hour: 9
+end_hour: 18

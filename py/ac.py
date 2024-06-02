@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import pyodbc
 from sqlalchemy import MetaData, create_engine
@@ -98,8 +100,32 @@ def main(db_path, excel_output_path, svg_output_path):
 
 
 # 実行例
-db_path = "your_database_path.accdb"
-excel_output_path = "access_details.xlsx"
-svg_output_path = "dbschema.svg"
+# db_path = r"D:\Documents\Database1.accdb;"
+# excel_output_path = "access_details.xlsx"
+# svg_output_path = "dbschema.svg"
 
-main(db_path, excel_output_path, svg_output_path)
+# main(db_path, excel_output_path, svg_output_path)
+
+# SQLite データベースファイルのパスを指定
+DATABASE_URL = r"sqlite:///H:/bak/Dev/example.sqlite3"
+
+# SQLAlchemy エンジンの作成
+engine = create_engine(DATABASE_URL, echo=True)
+
+# メタデータの作成
+metadata = MetaData()
+metadata.reflect(bind=engine)
+
+# スキーマグラフの作成
+graph = create_schema_graph(
+    metadata=metadata,
+    show_datatypes=False,  # データ型を表示しない
+    show_indexes=False,  # インデックスを表示しない
+    rankdir="LR",  # 左から右に描画
+    concentrate=False,  # 関連線をまとめない
+    engine=engine,
+)
+
+# スキーマグラフをPNG画像として保存
+current_path = os.path.dirname(__file__)
+graph.write_png(os.path.join(current_path, "dbschema.png"))

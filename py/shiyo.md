@@ -57,3 +57,7 @@
 ### 3. アウトプットファイルの確認
 
 処理が完了したら、アウトプットフォルダに生成されたファイルを確認します。
+
+https://officeforest.org/wp/2022/04/12/vbs%e3%81%a7excel%e6%93%8d%e4%bd%9c%e3%81%a7%e3%82%88%e3%81%8f%e5%88%a9%e7%94%a8%e3%81%97%e3%81%a6%e3%82%8b%e3%83%86%e3%82%af%e3%83%8b%e3%83%83%e3%82%af/#i-2
+https://officeforest.org/wp/2024/06/01/google%e3%82%b9%e3%83%97%e3%83%ac%e3%83%83%e3%83%89%e3%82%b7%e3%83%bc%e3%83%88%e3%81%ab%e3%83%86%e3%83%bc%e3%83%96%e3%83%ab%e6%a9%9f%e8%83%bd%e3%81%8c%e6%9d%a5%e3%81%9f%e3%82%88/
+https://www.microsoft.com/ja-jp/download/details.aspx?id=54920
