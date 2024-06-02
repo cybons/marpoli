@@ -1,0 +1,11 @@
+sites:
+  - name: Niche PC Gamer
+    url: https://www.nichepcgamer.com/archives/category/windowsupdate/feed
+    keywords: []
+    regexes: ['\\bUpdate\\b']
+  - name: ソフトアンテナ
+    url: https://softantenna.com/blog/feed/
+    keywords: []
+    regexes: []
+common_keywords: ["Update", "Windows", "不具合", "バグ", "Update"]
+common_regexes: ['\\bKB\d{7}\\b']
