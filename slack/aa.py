@@ -151,3 +151,29 @@ def handle_resubmission(ack, body, client):
                 }
             ]
         )
+@app.action("request_revision")
+    def handle_revision_request(ack, body, client):
+        ack()
+        requester, files_text, date, assignee_ids = body["actions"][0]["value"].split('|')
+        client.views_open(
+            trigger_id=body["trigger_id"],
+            view={
+                "type": "modal",
+                "callback_id": "revision_form",
+                "title": {"type": "plain_text", "text": "修正依頼フォーム"},
+                "submit": {"type": "plain_text", "text": "送信"},
+                "blocks": [
+                    {
+                        "type": "input",
+                        "block_id": "revision_block",
+                        "element": {
+                            "type": "plain_text_input",
+                            "action_id": "revision_input",
+                            "multiline": True,
+                        },
+                        "label": {"type": "plain_text", "text": "修正箇所"},
+                    }
+                ],
+                "private_metadata": f"{requester}|{files_text}|{date}|{assignee_ids}"
+            },
+        )
