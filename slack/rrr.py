@@ -120,3 +120,103 @@ def handle_submission(ack, body, client):
                 }
             ]
         )
+        
+@app.action("resubmit_request")
+def handle_resubmit_request(ack, body, client):
+    ack()
+    files_text, date = body["actions"][0]["value"].split('|')
+    trigger_id = body["trigger_id"]
+    
+    assignee_options = [
+        {
+            "text": {"type": "plain_text", "text": assignee["name"]},
+            "value": assignee["id"],
+        }
+        for assignee in ASSIGNEE_LIST
+    ]
+
+    client.views_open(
+        trigger_id=trigger_id,
+        view={
+            "type": "modal",
+            "callback_id": "resubmit_form",
+            "title": {"type": "plain_text", "text": "再申請フォーム"},
+            "submit": {"type": "plain_text", "text": "送信"},
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*ファイル/フォルダ:* {files_text}\n*作業日:* {date}"
+                    }
+                },
+                {
+                    "type": "input",
+                    "block_id": "assignee_block",
+                    "element": {
+                        "type": "checkboxes",
+                        "options": assignee_options,
+                        "initial_options": [
+                            {
+                                "text": {"type": "plain_text", "text": assignee["name"]},
+                                "value": assignee["id"],
+                            }
+                            for assignee in ASSIGNEE_LIST if assignee["id"] in initial_assignee_ids
+                        ],
+                        "action_id": "assignee_select"
+                    },
+                    "label": {"type": "plain_text", "text": "担当者"},
+                },
+            ],
+            "private_metadata": f"{files_text}|{date}"
+        }
+    )
+
+@app.view("resubmit_form")
+def handle_resubmission(ack, body, client):
+    ack()
+    values = body["view"]["state"]["values"]
+    assignees = values["assignee_block"]["assignee_select"]["selected_options"]
+    requester = body["user"]["id"]
+    files_text, date = body["view"]["private_metadata"].split('|')
+
+    assignee_ids = [assignee["value"] for assignee in assignees]
+
+    for assignee_id in assignee_ids:
+        client.chat_postMessage(
+            channel=assignee_id,
+            text=f"<@{requester}>さんからファイル/フォルダの再確認依頼があります。\n"
+            f"ファイル/フォルダ: {files_text}\n"
+            f"作業日: {date}",
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"<@{requester}>さんからファイル/フォルダの再確認依頼があります。\n"
+                        f"*ファイル/フォルダ:* {files_text}\n"
+                        f"*作業日:* {date}"
+                    }
+                },
+                {
+                    "type": "actions",
+                    "block_id": "response_actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "action_id": "approve_request",
+                            "text": {"type": "plain_text", "text": "承認"},
+                            "style": "primary",
+                            "value": requester
+                        },
+                        {
+                            "type": "button",
+                            "action_id": "request_revision",
+                            "text": {"type": "plain_text", "text": "修正依頼"},
+                            "style": "danger",
+                            "value": f"{requester}|{files_text}|{date}"
+                        }
+                    ]
+                }
+            ]
+        )
