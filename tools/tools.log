@@ -1,0 +1,21 @@
+2024-09-07 23:57:29,245 - tools - INFO - Received request: Hostname=1, MAC Address=3
+2024-09-07 23:57:29,247 - tools - ERROR - Invalid MAC Address Format: 3
+2024-09-07 23:57:29,248 - tools - ERROR - Error normalizing MAC address: Invalid MAC Address Format
+2024-09-08 00:47:44,733 - tools - INFO - Received request: Hostname=2, MAC Address=3
+2024-09-08 00:47:44,753 - tools - ERROR - Invalid MAC Address Format: 3
+2024-09-08 00:47:44,754 - tools - ERROR - Error normalizing MAC address: Invalid MAC Address Format
+2024-09-08 01:03:57,510 - tools - INFO - Received request: Hostname=2, MAC Address=1
+2024-09-08 01:03:57,514 - tools - ERROR - Invalid MAC Address Format: 1
+2024-09-08 01:03:57,515 - tools - ERROR - Error normalizing MAC address: Invalid MAC Address Format
+2024-09-08 01:05:13,552 - tools - INFO - Received request: Hostname=d, MAC Address=a
+2024-09-08 01:05:13,555 - tools - ERROR - Invalid MAC Address Format: A
+2024-09-08 01:05:13,556 - tools - ERROR - Error normalizing MAC address: Invalid MAC Address Format
+2024-09-08 08:23:13,375 - tools - INFO - Received request: Hostname=3,3, MAC Address=3
+2024-09-08 08:23:13,381 - tools - ERROR - Invalid MAC Address Format: 3
+2024-09-08 08:23:13,383 - tools - ERROR - Error normalizing MAC address: Invalid MAC Address Format
+2024-09-08 08:29:02,067 - tools - INFO - Received request: Hostname=a, MAC Address=a
+2024-09-08 08:29:02,072 - tools - ERROR - Invalid MAC Address Format: A
+2024-09-08 08:29:02,075 - tools - ERROR - Error normalizing MAC address: Invalid MAC Address Format
+2024-09-08 08:29:28,454 - tools - INFO - Received request: Hostname=a, MAC Address=a
+2024-09-08 08:29:28,458 - tools - ERROR - Invalid MAC Address Format: A
+2024-09-08 08:29:28,460 - tools - ERROR - Error normalizing MAC address: Invalid MAC Address Format
