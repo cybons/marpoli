@@ -1,15 +1,15 @@
 import pandas as pd
 
-def map_hierarchy_with_rank(
+def map_hierarchy_with_rank_corrected(
     df: pd.DataFrame,
     code_col: str = '組織コード',
     name_col: str = '組織名',
     rank_col: str = '組織ランク',
     parent_col: str = '上位組織コード',
-    max_depth: int = 6
+    max_rank: int = 6
 ) -> pd.DataFrame:
     """
-    組織の階層構造を「上位組織1」から「上位組織6」までの列にマッピングし、
+    組織の階層構造をランクに基づいて「上位組織1」から「上位組織6」までの列にマッピングし、
     各上位組織のランクも取得します。
     """
     # 組織コードから組織名およびランクへのマッピングを作成
@@ -17,31 +17,29 @@ def map_hierarchy_with_rank(
     code_to_rank = df.set_index(code_col)[rank_col].to_dict()
     code_to_parent = df.set_index(code_col)[parent_col].to_dict()
     
-    # 各組織の上位組織を取得する関数
-    def get_ancestors(code):
-        ancestors = []
-        ranks = []
-        current = code_to_parent.get(code)
-        for _ in range(max_depth):
-            if pd.isna(current) or current not in code_to_parent:
-                ancestors.append('')
-                ranks.append('')
-                current = None
-            else:
-                name = code_to_name.get(current, '')
-                rank = code_to_rank.get(current, '')
-                ancestors.append(name)
-                ranks.append(rank)
-                current = code_to_parent.get(current)
-        return ancestors + ranks
+    # ランクごとの上位組織を取得する関数
+    def get_ancestors_by_rank(code, max_rank):
+        ancestors = {f'上位組織{rank}': '' for rank in range(1, max_rank+1)}
+        rank_values = {f'上位組織ランク{rank}': '' for rank in range(1, max_rank+1)}
+        
+        current_code = code_to_parent.get(code)
+        while current_code and current_code in code_to_parent:
+            current_rank = code_to_rank.get(current_code, None)
+            current_name = code_to_name.get(current_code, '')
+            if current_rank and 1 <= current_rank <= max_rank:
+                ancestors[f'上位組織{current_rank}'] = current_name
+                rank_values[f'上位組織ランク{current_rank}'] = current_rank
+            current_code = code_to_parent.get(current_code)
+        
+        return list(ancestors.values()) + list(rank_values.values())
     
     # 上位組織1-6および上位組織ランク1-6の列名を生成
-    ancestor_columns = [f'上位組織{i}' for i in range(1, max_depth+1)]
-    rank_columns = [f'上位組織ランク{i}' for i in range(1, max_depth+1)]
+    ancestor_columns = [f'上位組織{rank}' for rank in range(1, max_rank+1)]
+    rank_columns = [f'上位組織ランク{rank}' for rank in range(1, max_rank+1)]
     all_columns = ancestor_columns + rank_columns
     
     # 各組織に対して上位組織とそのランクを取得
-    ancestors_df = df[code_col].apply(get_ancestors).apply(pd.Series)
+    ancestors_df = df[code_col].apply(lambda x: get_ancestors_by_rank(x, max_rank)).apply(pd.Series)
     ancestors_df.columns = all_columns
     
     # 元のデータフレームに上位組織の列を追加
@@ -78,18 +76,16 @@ def find_duplicate_organizations(
     
     return result
 
-def assign_unique_identifiers_with_abbreviation(
+def assign_unique_identifiers_with_abbreviation_corrected(
     df: pd.DataFrame,
     duplicates_df: pd.DataFrame,
     df_abbrev: pd.DataFrame,
-    upper_cols: list = ['上位組織1', '上位組織2', '上位組織3', '上位組織4', '上位組織5', '上位組織6'],
-    upper_rank_cols: list = ['上位組織ランク1', '上位組織ランク2', '上位組織ランク3', '上位組織ランク4', '上位組織ランク5', '上位組織ランク6'],
     abbrev_cols: list = ['組織名', '略称'],
     name_col: str = '組織名',
     identifier_suffix_format: str = '({abbrev})'
 ) -> (pd.DataFrame, list):
     """
-    重複する組織名にランク2の組織の略称を付与して一意に識別できるようにします。
+    重複する組織名に略称を付与して一意に識別できるようにします。
     略称リストに存在しない組織名があった場合はアラートを出力します。
     
     Parameters:
@@ -100,14 +96,10 @@ def assign_unique_identifiers_with_abbreviation(
         重複する組織名とそのパスを含むデータフレーム。
     df_abbrev : pd.DataFrame
         ランク2組織名と略称のリストを含むDataFrame。
-    upper_cols : list, optional
-        上位組織を表す列名のリスト。
-    upper_rank_cols : list, optional
-        上位組織ランクを表す列名のリスト。
     abbrev_cols : list, optional
-        略称リストの列名（組織名と略称）。
+        略称リストの列名（組織名と略称）。デフォルトは ['組織名', '略称']。
     name_col : str, optional
-        組織名を表す列名。
+        組織名を表す列名。デフォルトは '組織名'。
     identifier_suffix_format : str, optional
         識別子のフォーマット。デフォルトは '({abbrev})'。
     
@@ -136,11 +128,8 @@ def assign_unique_identifiers_with_abbreviation(
         # 各組織について識別子を決定
         for idx, row in orgs.iterrows():
             # ランク2の組織名を取得
-            rank2_org = ''
-            for upper_col, upper_rank_col in zip(upper_cols, upper_rank_cols):
-                if row[upper_rank_col] == 2:
-                    rank2_org = row[upper_col]
-                    break
+            rank2_org = row['上位組織2']  # 上位組織2にランク2の組織名が入っていると仮定
+            
             # 略称を取得
             if rank2_org in abbrev_dict:
                 abbrev = abbrev_dict[rank2_org]
@@ -163,16 +152,15 @@ def assign_unique_identifiers_with_abbreviation(
     
     return df, list(set(missing_abbrevs))  # 重複を排除
 
-def update_user_groups(
+def update_user_groups_corrected(
     df_users: pd.DataFrame,
     df_org: pd.DataFrame,
-    user_group_cols: list = ['組織コード'],
     org_code_col_user: str = '組織コード',
     org_code_col_org: str = '組織コード',
     org_name_col_org: str = '組織名'
 ) -> pd.DataFrame:
     """
-    ユーザー情報DataFrameのユーザーグループ列を、組織コードに基づいて更新された組織名に置き換えます。
+    ユーザー情報DataFrameの組織コードに基づいて組織名を更新します。
     
     Parameters:
     ----------
@@ -180,14 +168,12 @@ def update_user_groups(
         ユーザー情報を含むDataFrame。
     df_org : pd.DataFrame
         略称が付与された組織データフレーム。
-    user_group_cols : list, optional
-        更新対象のユーザーグループ列名のリスト。
     org_code_col_user : str, optional
-        ユーザー情報DataFrameでの組織コード列名。
+        ユーザー情報DataFrameでの組織コード列名。デフォルトは '組織コード'。
     org_code_col_org : str, optional
-        組織データフレームでの組織コード列名。
+        組織データフレームでの組織コード列名。デフォルトは '組織コード'。
     org_name_col_org : str, optional
-        組織データフレームでの組織名列名。
+        組織データフレームでの組織名列名。デフォルトは '組織名'。
     
     Returns:
     -------
@@ -217,14 +203,14 @@ if __name__ == "__main__":
     print("略称リストの読み込み:")
     print(df_abbrev.head())
     
-    # 階層マッピングの実行
-    mapped_df = map_hierarchy_with_rank(
+    # 階層マッピングの実行（修正後）
+    mapped_df = map_hierarchy_with_rank_corrected(
         df_org,
         code_col='組織コード',
         name_col='組織名',
         rank_col='組織ランク',
         parent_col='上位組織コード',
-        max_depth=6
+        max_rank=6
     )
     
     print("\n階層マッピング後のデータフレーム:")
@@ -237,12 +223,10 @@ if __name__ == "__main__":
     print(duplicate_orgs)
     
     # 重複組織名に略称を付与
-    mapped_df_unique, missing_abbrevs = assign_unique_identifiers_with_abbreviation(
+    mapped_df_unique, missing_abbrevs = assign_unique_identifiers_with_abbreviation_corrected(
         df=mapped_df,
         duplicates_df=duplicate_orgs,
         df_abbrev=df_abbrev,
-        upper_cols=['上位組織1', '上位組織2', '上位組織3', '上位組織4', '上位組織5', '上位組織6'],
-        upper_rank_cols=['上位組織ランク1', '上位組織ランク2', '上位組織ランク3', '上位組織ランク4', '上位組織ランク5', '上位組織ランク6'],
         abbrev_cols=['組織名', '略称'],
         name_col='組織名',
         identifier_suffix_format='({abbrev})'
@@ -268,7 +252,7 @@ if __name__ == "__main__":
         'ユーザーグループ1': ['本社', '本社', '支社', '支社'],
         'ユーザーグループ2': ['エンジニアリング事業本部', '人事部', '営業部', '人事部'],
         'ユーザーグループ3': ['営業課', '人事課', '', ''],
-        'ユーザーグループ4': ['営業課', '人事課', '営業部 (営業)', '人事部 (人事)'],
+        'ユーザーグループ4': ['営業課', '人事課', '営業部 (営業支社)', '人事部 (人事支社)'],
         'ユーザーグループ5': ['', '', '', ''],
         'ユーザーグループ6': ['', '', '', '']
     }
@@ -279,10 +263,9 @@ if __name__ == "__main__":
     print(df_users)
     
     # ユーザーグループ列を組織コードに基づいて更新
-    df_users_updated = update_user_groups(
+    df_users_updated = update_user_groups_corrected(
         df_users,
         df_org=mapped_df_unique,
-        user_group_cols=['組織コード'],
         org_code_col_user='組織コード',
         org_code_col_org='組織コード',
         org_name_col_org='組織名'
