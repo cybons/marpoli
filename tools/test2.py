@@ -190,6 +190,152 @@ def add_abbreviations_to_names(
     return df
 
 
+def reshape_rank_names(df, start_rank=3, end_rank=6):
+    """
+    指定された範囲のランク名列を縦持ちに変換し、重複を排除する関数。
+
+    Parameters:
+    df (pd.DataFrame): 元のデータフレーム。
+    start_rank (int): 縦持ちに開始するランク（デフォルトは3）。
+    end_rank (int): 縦持ちに終了するランク（デフォルトは6）。
+
+    Returns:
+    pd.DataFrame: ランク番号と組織名の2列からなる縦持ちのデータフレーム。
+    """
+    # 対象となるランクのname列をリストアップ
+    rank_name_cols = [f"rank{i}_name" for i in range(start_rank, end_rank + 1)]
+
+    # pandasのmelt関数を使用して縦持ちに変換
+    melted_df = df.melt(
+        value_vars=rank_name_cols,
+        var_name="rank",
+        value_name="group_name",
+    )
+
+    # group_name_newがNaNまたはNoneの行を削除
+    melted_df = melted_df.dropna(subset=["group_name"])
+
+    # rank列からランク番号を抽出
+    melted_df["rank"] = melted_df["rank"].str.extract(r"rank(\d+)_name").astype(int)
+
+    # 重複を排除
+    unique_df = melted_df.drop_duplicates(subset=["rank", "group_name"]).reset_index(
+        drop=True
+    )
+
+    # 不要なorg_code列を削除（必要に応じて保持）
+    unique_df = unique_df[["rank", "group_name"]]
+
+    unique_df = unique_df.rename(columns={"rank": "dll"})
+
+    return unique_df
+
+
+def create_update_file_v4(reshaped_df, downloaded_df):
+    """
+    縦持ちにしたデータフレームとダウンロードしたファイルを比較し、更新ファイルを作成する関数。
+
+    Parameters:
+    reshaped_df (pd.DataFrame): 縦持ちにしたデータフレーム。'dll'と'group_name'列を含む。
+    downloaded_df (pd.DataFrame): ダウンロードしたファイルのデータフレーム。'フラグ', '変更後グループ', '変更前グループ', 'dll', '無効'列を含む。
+
+    Returns:
+    pd.DataFrame: 更新ファイル用のデータフレーム。'フラグ', '変更後グループ', '変更前グループ', 'dll', '無効'列を含む。
+    """
+
+    # ロギングの設定（メインスクリプトで既に設定されている場合は不要）
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+    # 列名の変更: 'rank'を'dll'に、'org_name'を'group_name'に
+    reshaped_df = reshaped_df.rename(columns={"rank": "dll", "org_name": "group_name"})
+
+    # 外部結合: reshaped_dfとdownloaded_dfを'group_name'と'変更前グループ'で結合
+    merged_df = pd.merge(
+        reshaped_df,
+        downloaded_df,
+        how="outer",
+        left_on="group_name",
+        right_on="変更前グループ",
+        suffixes=("_reshaped", "_downloaded"),
+        indicator=True,
+    )
+
+    # 更新対象リストとアラートリストの初期化
+    alerts = []
+
+    # 両方に存在する場合
+    mask_both = merged_df["_merge"] == "both"
+    # 'dll' または '無効' フラグが異なる場合
+    mask_update = mask_both & (
+        (merged_df["dll_reshaped"] != merged_df["dll_downloaded"])
+        | (merged_df["無効"] == 1)
+    )
+    update_rows = merged_df[mask_update]
+
+    # 'dll' が異なる場合にアラートを追加
+    mask_dll_diff = mask_both & (
+        merged_df["dll_reshaped"] != merged_df["dll_downloaded"]
+    )
+    alert_names = merged_df.loc[mask_dll_diff, "group_name"].unique()
+    for name in alert_names:
+        alert_msg = f"組織名 '{name}' のdllが異なります。reshaped dll: {merged_df.loc[merged_df['group_name'] == name, 'dll_reshaped'].iloc[0]}, downloaded dll: {merged_df.loc[merged_df['group_name'] == name, 'dll_downloaded'].iloc[0]}"
+        alerts.append(alert_msg)
+        logging.warning(alert_msg)
+
+    # 'both' かつ更新が必要な行を 'update' フラグで追加
+    updates_add = pd.DataFrame(
+        {
+            "フラグ": "update",
+            "変更後グループ": update_rows["group_name"],
+            "変更前グループ": update_rows["変更前グループ"],
+            "dll": update_rows["dll_reshaped"],
+            "無効": 0,
+        }
+    )
+
+    # 左みのみ: reshaped_dfに存在し、downloaded_dfに存在しない -> 'add'
+    mask_add = merged_df["_merge"] == "left_only"
+    add_rows = merged_df[mask_add]
+    additions = pd.DataFrame(
+        {
+            "フラグ": "add",
+            "変更後グループ": add_rows["group_name"],
+            "変更前グループ": add_rows["group_name"],
+            "dll": add_rows["dll_reshaped"],
+            "無効": 0,  # 新規追加は無効フラグは0
+        }
+    )
+
+    # 右みのみ: downloaded_dfに存在し、reshaped_dfに存在しない -> 'disable' (無効フラグを1)
+    mask_right_only = merged_df["_merge"] == "right_only"
+    # '無効' フラグが1ではない場合にのみ 'update' として無効化
+    mask_disable = mask_right_only & (merged_df["無効"] != 1)
+    disable_rows = merged_df[mask_disable]
+    disables = pd.DataFrame(
+        {
+            "フラグ": "update",
+            "変更後グループ": disable_rows["変更後グループ"],
+            "変更前グループ": disable_rows["変更前グループ"],
+            "dll": disable_rows["dll_downloaded"],
+            "無効": 1,  # 無効フラグを1に設定
+        }
+    )
+
+    # 重複する組織名が存在する場合のアラート
+    duplicate_group_names = reshaped_df["group_name"].duplicated(keep=False)
+    if duplicate_group_names.any():
+        duplicate_names = reshaped_df.loc[duplicate_group_names, "group_name"].unique()
+        for name in duplicate_names:
+            alert_msg = f"重複した組織名 '{name}' が存在します。識別子が正しく付与されているか確認してください。"
+            alerts.append(alert_msg)
+            logging.warning(alert_msg)
+
+    # 更新ファイル用のDataFrameを結合
+    update_df = pd.concat([updates_add, additions, disables], ignore_index=True)
+
+    return update_df
+
+
 def main():
     """
     メイン関数：組織データを処理し、識別子を付与したrank1〜rank7の組織名を出力する。
@@ -249,6 +395,27 @@ def main():
     # 最終的なデータフレームの表示
     print("\n最終的なデータフレーム（識別子付き）:")
     print(df)
+
+    # 縦持ちに変換されたデータフレーム
+    reshaped_df = reshape_rank_names(df, start_rank=3, end_rank=6)  # 前回の関数
+
+    # ダウンロードしてきたファイルのサンプルデータ
+    downloaded_data = {
+        "フラグ": ["add", "update", "add", "update"],
+        "変更後グループ": ["Team （D1）", "Team （D2）", "Team （T1）", "Team （T2）"],
+        "変更前グループ": ["Team （D1）", "Team （D2）", "Team （T1）", "Team （T2）"],
+        "dll": [4, 4, 5, 6],
+        "無効": [0, 0, 0, 1],
+    }
+
+    downloaded_df = pd.DataFrame(downloaded_data)
+
+    # 更新ファイルの作成
+    update_df = create_update_file_v4(reshaped_df, downloaded_df)
+
+    # 更新ファイルの表示
+    print("\n更新ファイル:")
+    print(update_df)
 
 
 if __name__ == "__main__":
